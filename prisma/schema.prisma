@@ -11,10 +11,11 @@ datasource db {
 }
 
 model Sensor {
-  id        String    @id
-  latitude  Float
-  longitude Float
-  readings  Reading[]
+  id           String    @id
+  friendlyName String    @default("unnamed") @map("friendly_name")
+  latitude     Float
+  longitude    Float
+  readings     Reading[]
 
   @@map("sensors")
 }

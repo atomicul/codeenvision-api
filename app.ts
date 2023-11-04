@@ -63,7 +63,6 @@ app.post('/readings', async (req, res) => {
     console.error(e)
     res.status(500).end();
   }
-
 });
 
 const server = https.createServer({ key: key, cert: cert }, app);
