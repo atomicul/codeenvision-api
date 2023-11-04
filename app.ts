@@ -1,10 +1,17 @@
-import express, { json } from 'express';
+import express from 'express';
+import cors from 'cors';
 import { PrismaClient } from '@prisma/client'
+import fs from 'fs';
+import https from 'https';
 const prisma = new PrismaClient()
 const app = express();
 const port = 3000;
 
 app.use(express.json())
+app.use(cors())
+
+const key = fs.readFileSync(__dirname + '/selfsigned.key');
+const cert = fs.readFileSync(__dirname + '/selfsigned.crt');
 
 app.get('/sensors', async (req, res) => {
   try {
@@ -20,18 +27,16 @@ app.post('/reading', async (req, res) => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   try {
-    console.log(
-      await prisma.reading.create({
-        data: {
-          sensorId: req.body.id,
-          temperature: req.body.temperature,
-          humidity: req.body.humidity,
-          ppm: req.body.ppm,
-          day: today,
-          dustConcentration: req.body.dustConcentration,
-        }
-      })
-    )
+    await prisma.reading.create({
+      data: {
+        sensorId: req.body.id,
+        temperature: req.body.temperature,
+        humidity: req.body.humidity,
+        ppm: req.body.ppm,
+        day: today,
+        dustConcentration: req.body.dustConcentration,
+      }
+    })
     res.status(200).end();
   } catch (e) {
     console.error(e)
@@ -40,9 +45,10 @@ app.post('/reading', async (req, res) => {
 });
 
 app.post('/readings', async (req, res) => {
-  const { id } = req.body;
+  const id = req.body.id;
   if (typeof id !== 'string') {
-    return res.status(400).end();
+    console.log(id)
+    return res.status(400).json({ msg: 'bad id' });
   }
   try {
     const data = await prisma.$queryRaw`SELECT AVG(temperature) as temperature, AVG(humidity) as humidity, 
@@ -52,7 +58,6 @@ app.post('/readings', async (req, res) => {
                                         FROM readings
                                         WHERE sensor_id = ${id}
                                         GROUP BY day`;
-    console.log(JSON.stringify(data));
     res.json(data)
   } catch (e) {
     console.error(e)
@@ -61,6 +66,7 @@ app.post('/readings', async (req, res) => {
 
 });
 
-app.listen(port, () => {
-  console.log(`⚡️[server]: Server is running at http://localhost:${port}`);
+const server = https.createServer({ key: key, cert: cert }, app);
+server.listen(port, () => {
+  console.log(`⚡️[server]: Server is running at https://localhost:${port}`);
 });
