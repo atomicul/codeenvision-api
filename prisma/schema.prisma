@@ -33,3 +33,10 @@ model Reading {
 
   @@map("readings")
 }
+
+model Token {
+  id     String   @id
+  expire DateTime
+
+  @@map("tokens")
+}

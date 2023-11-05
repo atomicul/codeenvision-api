@@ -4,3 +4,4 @@ node_modules
 selfsigned.key
 selfsigned.crt
 prisma/migrations
+prisma/database.db

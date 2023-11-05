@@ -3,6 +3,7 @@ import cors from 'cors';
 import { PrismaClient } from '@prisma/client'
 import fs from 'fs';
 import https from 'https';
+import crypto from 'crypto';
 const prisma = new PrismaClient()
 const app = express();
 const port = 3000;
@@ -12,6 +13,63 @@ app.use(cors())
 
 const key = fs.readFileSync(__dirname + '/selfsigned.key');
 const cert = fs.readFileSync(__dirname + '/selfsigned.crt');
+
+app.use(async (req, res, next) => {
+  if (req.path === '/auth' || req.path === '/reading')
+    return next();
+  try {
+    let token = req.headers["authorization"]
+    if (!token)
+      return res.status(401).json({ msg: 'no token' });
+    token = token.split(" ")[1];
+
+    const dbToken = await prisma.token.findUnique({
+      where: {
+        id: token
+      }
+    })
+    if (!dbToken)
+      return res.status(401).json({ msg: 'invalid token' });
+    if (dbToken.expire.getTime() < Date.now())
+      return res.status(401).json({ msg: 'token expired' });
+
+    await prisma.token.update({
+      where: {
+        id: token
+      },
+      data: {
+        expire: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7)
+      }
+    })
+    next()
+  } catch (e) {
+    console.error(e)
+    return res.status(500).end();
+  }
+})
+
+app.post('/auth', async (req, res) => {
+  const { user, pass } = req.body;
+  if (user !== process.env.USER || pass !== process.env.PASS) {
+    return res.status(401).json({ msg: 'bad credentials' });
+  }
+  require('crypto').randomBytes(128, async function(_: any, buf: any) {
+    const token: string = buf.toString('base64');
+    try {
+      await prisma.token.create({
+        data: {
+          id: token,
+          expire: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7)
+        }
+      })
+      return res.status(200).json({ token });
+    } catch (e) {
+      console.error(e);
+      return res.status(500).end();
+    }
+  });
+
+});
 
 app.get('/sensors', async (req, res) => {
   try {
